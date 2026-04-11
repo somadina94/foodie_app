@@ -11,6 +11,8 @@ npm-debug.*
 web-build/
 
 .env
+GoogleService-Info.plist
+google-services.json
 
 
 ios
