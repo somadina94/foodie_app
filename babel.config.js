@@ -1,12 +1,18 @@
 module.exports = function (api) {
   api.cache(true);
-  let plugins = [];
-
-  plugins.push('react-native-worklets/plugin');
-
   return {
-    presets: [['babel-preset-expo', { jsxImportSource: 'nativewind' }], 'nativewind/babel'],
-
-    plugins,
+    presets: [
+      [
+        'babel-preset-expo',
+        {
+          jsxImportSource: 'nativewind',
+          // nativewind/babel (react-native-css-interop) already injects
+          // react-native-worklets/plugin; reanimated/plugin is the same module.
+          worklets: false,
+          reanimated: false,
+        },
+      ],
+      'nativewind/babel',
+    ],
   };
 };
