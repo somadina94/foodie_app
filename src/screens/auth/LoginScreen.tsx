@@ -31,7 +31,12 @@ export function LoginScreen({ navigation }: Props) {
       await saveToken(res.token);
       dispatch(setCredentials({ user: res.data.user }));
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Sign in failed');
+      if (e instanceof ApiError) {
+        setError(e.message);
+      } else {
+        const detail = e instanceof Error ? e.message : 'Unknown error';
+        setError(`Sign in failed (${detail}). Check your connection.`);
+      }
     } finally {
       setLoading(false);
     }
