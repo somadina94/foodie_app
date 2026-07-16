@@ -12,12 +12,18 @@
     "preview": {
       "distribution": "internal",
       "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://foodieapi.jahbyte.com/api/v1"
+      },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
-      "environment": "production"
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://foodieapi.jahbyte.com/api/v1"
+      }
     }
   },
   "submit": {
