@@ -10,7 +10,6 @@ import { VendorNavigator } from '@/navigation/VendorNavigator';
 import { RiderNavigator } from '@/navigation/RiderNavigator';
 import { AdminNavigator } from '@/navigation/AdminNavigator';
 import { PushNotificationGate } from '@/components/providers/PushNotificationGate';
-import { StaffPushTokenSync } from '@/components/providers/StaffPushTokenSync';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -36,8 +35,6 @@ export function RootNavigator() {
             ? 'rider'
             : 'admin';
 
-  const staffRole = role === 'vendor' || role === 'rider' || role === 'admin';
-
   return (
     <View style={{ flex: 1 }}>
       <Stack.Navigator key={stackKey} screenOptions={{ headerShown: false }}>
@@ -54,7 +51,6 @@ export function RootNavigator() {
         )}
       </Stack.Navigator>
       {isAuthenticated && role === 'user' ? <PushNotificationGate /> : null}
-      {isAuthenticated && staffRole ? <StaffPushTokenSync /> : null}
     </View>
   );
 }

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import * as Notifications from 'expo-notifications';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { theme } from '@/lib/theme';
@@ -9,13 +8,13 @@ import { deleteToken } from '@/lib/secureToken';
 import { logout } from '@/store/authSlice';
 import { clearCart } from '@/store/cartSlice';
 import {
-  ensureAndroidNotificationChannel,
-  registerExpoPushTokenOnServer,
+  getNotificationPermissionLabel,
+  registerForPushNotificationsAsync,
 } from '@/lib/pushNotifications';
 
 /**
  * After sign-in (when bootstrapped), mirrors web: require notification opt-in or sign out.
- * If permission is already granted, syncs the Expo push token to the server (with retries).
+ * Token registration itself also runs in AppProviders (Luxestate-style AppState sync).
  */
 export function PushNotificationGate() {
   const bootstrapped = useAppSelector((s) => s.auth.bootstrapped);
@@ -29,8 +28,6 @@ export function PushNotificationGate() {
   const [busy, setBusy] = useState(false);
 
   const denyHandledRef = useRef(false);
-  const syncInFlightRef = useRef(false);
-  const lastSyncedUserIdRef = useRef<string | null>(null);
 
   const performLogout = useCallback(async () => {
     await deleteToken();
@@ -42,7 +39,6 @@ export function PushNotificationGate() {
   useEffect(() => {
     if (!isAuthenticated) {
       denyHandledRef.current = false;
-      lastSyncedUserIdRef.current = null;
       setShowModal(false);
     }
   }, [isAuthenticated]);
@@ -53,11 +49,10 @@ export function PushNotificationGate() {
     let cancelled = false;
 
     (async () => {
-      await ensureAndroidNotificationChannel();
-      const { status } = await Notifications.getPermissionsAsync();
+      const label = await getNotificationPermissionLabel();
       if (cancelled) return;
 
-      if (status === 'denied') {
+      if (label === 'Denied') {
         if (!denyHandledRef.current) {
           denyHandledRef.current = true;
           await performLogout();
@@ -69,24 +64,8 @@ export function PushNotificationGate() {
         return;
       }
 
-      if (status === 'granted') {
+      if (label === 'Allowed') {
         setShowModal(false);
-        if (lastSyncedUserIdRef.current === userId || syncInFlightRef.current) return;
-        syncInFlightRef.current = true;
-        try {
-          // Brief delay so secure-store session is stable right after sign-in / bootstrap.
-          await new Promise((r) => setTimeout(r, 400));
-          if (cancelled) return;
-          const r = await registerExpoPushTokenOnServer();
-          if (!cancelled && r.tokenRegistered) {
-            lastSyncedUserIdRef.current = userId;
-          } else if (!cancelled && r.errorMessage) {
-            if (__DEV__) console.warn('[push gate] token sync:', r.errorMessage);
-            Alert.alert('Notifications', r.errorMessage);
-          }
-        } finally {
-          syncInFlightRef.current = false;
-        }
         return;
       }
 
@@ -101,15 +80,9 @@ export function PushNotificationGate() {
   async function onAllowNotifications() {
     setBusy(true);
     try {
-      const { status } = await Notifications.requestPermissionsAsync({
-        ios: {
-          allowAlert: true,
-          allowBadge: true,
-          allowSound: true,
-        },
-      });
+      const r = await registerForPushNotificationsAsync();
 
-      if (status === 'denied') {
+      if (r.status === 'denied') {
         if (!denyHandledRef.current) {
           denyHandledRef.current = true;
           await performLogout();
@@ -122,15 +95,12 @@ export function PushNotificationGate() {
         return;
       }
 
-      if (status !== 'granted') {
+      if (r.status !== 'granted') {
         return;
       }
 
       setShowModal(false);
-      const r = await registerExpoPushTokenOnServer();
-      if (r.tokenRegistered) {
-        lastSyncedUserIdRef.current = userId ?? null;
-      } else if (r.errorMessage) {
+      if (!r.tokenRegistered && r.errorMessage) {
         Alert.alert('Push setup', r.errorMessage);
       }
     } finally {

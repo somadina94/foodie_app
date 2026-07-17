@@ -9,10 +9,12 @@ npm-debug.*
 *.mobileprovision
 *.orig.*
 web-build/
-
 .env
+*firebase-adminsdk*.json
 GoogleService-Info.plist
-google-services.json
+
+
+
 
 ios
 android

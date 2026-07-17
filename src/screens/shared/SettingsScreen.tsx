@@ -129,7 +129,7 @@ export function SettingsScreen() {
         Alert.alert(
           'Push token not saved',
           r.errorMessage ??
-            'Permission is on, but the token could not be registered. Use a physical device, set EXPO_PUBLIC_EAS_PROJECT_ID in .env, rebuild, and try again.',
+            'Permission is on, but the token could not be registered. Use a physical device and a preview/dev build (not Expo Go), then try again.',
         );
       }
     } finally {

@@ -1,23 +1,22 @@
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 
 import { setExpoPushToken } from '@/services/userService';
 import { ApiError } from '@/services/apiClient';
 
+/** Expo Go cannot register remote push tokens (SDK 53+). Need a preview/dev/production build. */
+export function isExpoGo() {
+  return Constants.appOwnership === 'expo';
+}
+
 function getExpoProjectId(): string | undefined {
   const fromEnv = process.env.EXPO_PUBLIC_EAS_PROJECT_ID?.trim();
   if (fromEnv) return fromEnv;
-  const extra = Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined;
-  const fromManifest =
-    extra?.eas?.projectId ??
-    (Constants as unknown as { easConfig?: { projectId?: string } }).easConfig?.projectId;
-  if (fromManifest) return fromManifest;
-  // Bare / dev client builds sometimes expose project id here
-  const legacy = (Constants as unknown as { manifest?: { extra?: { eas?: { projectId?: string } } } })
-    .manifest?.extra?.eas?.projectId;
-  return legacy;
+  return (
+    Constants?.expoConfig?.extra?.eas?.projectId ??
+    (Constants as { easConfig?: { projectId?: string } }).easConfig?.projectId
+  );
 }
 
 async function setExpoPushTokenWithRetry(token: string): Promise<void> {
@@ -34,15 +33,23 @@ async function setExpoPushTokenWithRetry(token: string): Promise<void> {
   throw last;
 }
 
+/**
+ * Matches Luxestate: Android channel id must be `default` (backend sends channelId: "default").
+ */
 export async function ensureAndroidNotificationChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
+  // Dynamic import so Expo Go never loads expo-notifications at module top-level paths that call this.
+  const Notifications = await import('expo-notifications');
   await Notifications.setNotificationChannelAsync('default', {
-    name: 'default',
-    importance: Notifications.AndroidImportance.DEFAULT,
+    name: 'Orders & alerts',
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#f76707',
   });
 }
 
 export async function getNotificationPermissionLabel(): Promise<string> {
+  const Notifications = await import('expo-notifications');
   const { status } = await Notifications.getPermissionsAsync();
   if (status === 'granted') return 'Allowed';
   if (status === 'denied') return 'Denied';
@@ -51,19 +58,17 @@ export async function getNotificationPermissionLabel(): Promise<string> {
 
 /**
  * Call when OS notification permission is already granted: resolves Expo push token and PATCHes /users/expoPushToken.
- * Retries the API a few times (e.g. right after login when the session is still settling).
  */
 export async function registerExpoPushTokenOnServer(): Promise<{
   tokenRegistered: boolean;
   errorMessage?: string;
 }> {
-  await ensureAndroidNotificationChannel();
-
-  const { status } = await Notifications.getPermissionsAsync();
-  if (status !== 'granted') {
-    return { tokenRegistered: false, errorMessage: 'Notification permission is not granted.' };
+  if (isExpoGo()) {
+    return {
+      tokenRegistered: false,
+      errorMessage: 'Remote push is disabled in Expo Go. Install your EAS preview/dev build.',
+    };
   }
-
   if (!Device.isDevice) {
     return {
       tokenRegistered: false,
@@ -71,18 +76,31 @@ export async function registerExpoPushTokenOnServer(): Promise<{
     };
   }
 
-  const projectId = getExpoProjectId();
-  if (!projectId) {
-    return {
-      tokenRegistered: false,
-      errorMessage:
-        'Missing EAS project ID. Add EXPO_PUBLIC_EAS_PROJECT_ID to .env, rebuild the native app (npx expo run:ios / run:android).',
-    };
+  const Notifications = await import('expo-notifications');
+
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+
+  await ensureAndroidNotificationChannel();
+
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') {
+    return { tokenRegistered: false, errorMessage: 'Notification permission is not granted.' };
   }
 
+  const projectId = getExpoProjectId();
   let token: string;
   try {
-    const expo = await Notifications.getExpoPushTokenAsync({ projectId });
+    const expo = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined,
+    );
     token = expo.data?.trim() ?? '';
     if (!token) {
       return { tokenRegistered: false, errorMessage: 'Expo did not return a push token.' };
@@ -95,13 +113,14 @@ export async function registerExpoPushTokenOnServer(): Promise<{
     return {
       tokenRegistered: false,
       errorMessage: msg.includes('ERR_NOTIFICATIONS_NO_EXPERIENCE_ID')
-        ? 'Missing EAS project ID in the native app. Set EXPO_PUBLIC_EAS_PROJECT_ID and rebuild.'
+        ? 'Missing EAS project ID in the native app. Rebuild with extra.eas.projectId set.'
         : msg,
     };
   }
 
   try {
     await setExpoPushTokenWithRetry(token);
+    if (__DEV__) console.log('[push] Registered token with server');
     return { tokenRegistered: true };
   } catch (e: unknown) {
     const msg = e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'Could not save push token';
@@ -113,30 +132,49 @@ export async function registerExpoPushTokenOnServer(): Promise<{
 }
 
 /**
- * Requests system permission if needed, then registers the token (e.g. Settings → Enable notifications).
+ * Luxestate-style: request system permission if needed, then register the Expo push token.
  */
 export async function registerForPushNotificationsAsync(): Promise<{
   status: 'granted' | 'denied' | 'undetermined';
   tokenRegistered: boolean;
   errorMessage?: string;
 }> {
+  if (isExpoGo()) {
+    if (__DEV__) {
+      console.warn('[push] Remote push is disabled in Expo Go. Install your EAS APK/dev build.');
+    }
+    return { status: 'undetermined', tokenRegistered: false, errorMessage: 'Expo Go does not support remote push.' };
+  }
+  if (!Device.isDevice) {
+    if (__DEV__) console.warn('[push] Push requires a physical device.');
+    return { status: 'undetermined', tokenRegistered: false, errorMessage: 'Push requires a physical device.' };
+  }
+
+  const Notifications = await import('expo-notifications');
+
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+
   await ensureAndroidNotificationChannel();
 
   const { status: existing } = await Notifications.getPermissionsAsync();
   let finalStatus = existing;
 
   if (existing !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync({
-      ios: {
-        allowAlert: true,
-        allowBadge: true,
-        allowSound: true,
-      },
-    });
+    // Same as Luxestate: plain request (plugin adds Android POST_NOTIFICATIONS).
+    const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
 
   if (finalStatus !== 'granted') {
+    if (__DEV__) console.warn('[push] Notification permission not granted:', finalStatus);
     return {
       status: finalStatus === 'denied' ? 'denied' : 'undetermined',
       tokenRegistered: false,
