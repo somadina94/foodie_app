@@ -5,6 +5,7 @@ import { LayoutGrid, ShoppingBag, Home, Receipt } from 'lucide-react-native';
 
 import { theme } from '@/lib/theme';
 import { countActiveOrders, formatTabBadge } from '@/lib/orderCounts';
+import { useTabBarSafeStyle } from '@/lib/tabBarSafeStyle';
 import type { CustomerTabParamList } from '@/navigation/types';
 import { CustomerMenuStack } from '@/navigation/CustomerMenuStack';
 import { CustomerOrdersStack } from '@/navigation/CustomerOrdersStack';
@@ -15,6 +16,13 @@ import { listMyOrders } from '@/services/orderService';
 const Tab = createBottomTabNavigator<CustomerTabParamList>();
 
 export function CustomerTabNavigator() {
+  const tabBarStyle = useTabBarSafeStyle({
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+  });
   const { data: ordersData } = useQuery({
     queryKey: ['orders', 'mine'],
     queryFn: listMyOrders,
@@ -30,17 +38,7 @@ export function CustomerTabNavigator() {
         headerShown: false,
         tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: '#737373',
-        tabBarStyle: {
-          borderTopWidth: 0,
-          elevation: 12,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.06,
-          shadowRadius: 12,
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 8,
-        },
+        tabBarStyle,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         tabBarBadgeStyle: {
           backgroundColor: theme.primary,

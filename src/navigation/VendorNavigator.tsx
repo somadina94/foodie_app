@@ -5,6 +5,7 @@ import { Bell, ChefHat, LayoutDashboard, UtensilsCrossed } from 'lucide-react-na
 
 import { theme } from '@/lib/theme';
 import { countActiveOrders, formatTabBadge } from '@/lib/orderCounts';
+import { useTabBarSafeStyle } from '@/lib/tabBarSafeStyle';
 import { LogoutHeaderButton } from '@/components/molecules/LogoutHeaderButton';
 import type { VendorTabParamList } from '@/navigation/types';
 import { VendorOverviewScreen } from '@/screens/vendor/VendorOverviewScreen';
@@ -17,6 +18,7 @@ import { listNotifications } from '@/services/notificationService';
 const Tab = createBottomTabNavigator<VendorTabParamList>();
 
 export function VendorNavigator() {
+  const tabBarStyle = useTabBarSafeStyle();
   const { data: notifData } = useQuery({
     queryKey: ['notifications'],
     queryFn: listNotifications,
@@ -41,7 +43,7 @@ export function VendorNavigator() {
         headerTitleStyle: { fontWeight: '700' },
         tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: '#737373',
-        tabBarStyle: { borderTopWidth: 0, elevation: 8 },
+        tabBarStyle,
         tabBarBadgeStyle: {
           backgroundColor: theme.primary,
           color: theme.primaryForeground,

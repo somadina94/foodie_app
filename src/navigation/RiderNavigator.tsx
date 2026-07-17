@@ -5,6 +5,7 @@ import { Bell, Bike, LayoutDashboard } from 'lucide-react-native';
 
 import { theme } from '@/lib/theme';
 import { countActiveOrders, formatTabBadge } from '@/lib/orderCounts';
+import { useTabBarSafeStyle } from '@/lib/tabBarSafeStyle';
 import { LogoutHeaderButton } from '@/components/molecules/LogoutHeaderButton';
 import type { RiderTabParamList } from '@/navigation/types';
 import { RiderOverviewScreen } from '@/screens/rider/RiderOverviewScreen';
@@ -16,6 +17,7 @@ import { listRiderOrders } from '@/services/orderService';
 const Tab = createBottomTabNavigator<RiderTabParamList>();
 
 export function RiderNavigator() {
+  const tabBarStyle = useTabBarSafeStyle();
   const { data: notifData } = useQuery({
     queryKey: ['notifications'],
     queryFn: listNotifications,
@@ -41,7 +43,7 @@ export function RiderNavigator() {
         headerTitleStyle: { fontWeight: '700' },
         tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: '#737373',
-        tabBarStyle: { borderTopWidth: 0, elevation: 8 },
+        tabBarStyle,
         tabBarBadgeStyle: {
           backgroundColor: theme.primary,
           color: theme.primaryForeground,

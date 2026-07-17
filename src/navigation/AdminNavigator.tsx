@@ -4,6 +4,7 @@ import { BarChart3, Bell, Shield } from 'lucide-react-native';
 
 import { theme } from '@/lib/theme';
 import { formatTabBadge } from '@/lib/orderCounts';
+import { useTabBarSafeStyle } from '@/lib/tabBarSafeStyle';
 import { LogoutHeaderButton } from '@/components/molecules/LogoutHeaderButton';
 import type { AdminTabParamList } from '@/navigation/types';
 import { NotificationsStack } from '@/navigation/NotificationsStack';
@@ -14,6 +15,7 @@ import { listNotifications } from '@/services/notificationService';
 const Tab = createBottomTabNavigator<AdminTabParamList>();
 
 export function AdminNavigator() {
+  const tabBarStyle = useTabBarSafeStyle();
   const { data: notifData } = useQuery({
     queryKey: ['notifications'],
     queryFn: listNotifications,
@@ -29,7 +31,7 @@ export function AdminNavigator() {
         headerTitleStyle: { fontWeight: '700' },
         tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: '#737373',
-        tabBarStyle: { borderTopWidth: 0, elevation: 8 },
+        tabBarStyle,
         tabBarBadgeStyle: {
           backgroundColor: theme.primary,
           color: theme.primaryForeground,
