@@ -9,6 +9,7 @@ import { logout } from '@/store/authSlice';
 import { clearCart } from '@/store/cartSlice';
 import {
   getNotificationPermissionLabel,
+  isExpoGo,
   registerForPushNotificationsAsync,
 } from '@/lib/pushNotifications';
 
@@ -44,32 +45,36 @@ export function PushNotificationGate() {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    if (!bootstrapped || !isAuthenticated || !userId) return;
+    if (!bootstrapped || !isAuthenticated || !userId || isExpoGo()) return;
 
     let cancelled = false;
 
     (async () => {
-      const label = await getNotificationPermissionLabel();
-      if (cancelled) return;
+      try {
+        const label = await getNotificationPermissionLabel();
+        if (cancelled) return;
 
-      if (label === 'Denied') {
-        if (!denyHandledRef.current) {
-          denyHandledRef.current = true;
-          await performLogout();
-          Alert.alert(
-            'Signed out',
-            'Notifications are required to use Foodie. Enable alerts in Settings and sign in again.',
-          );
+        if (label === 'Denied') {
+          if (!denyHandledRef.current) {
+            denyHandledRef.current = true;
+            await performLogout();
+            Alert.alert(
+              'Signed out',
+              'Notifications are required to use Foodie. Enable alerts in Settings and sign in again.',
+            );
+          }
+          return;
         }
-        return;
-      }
 
-      if (label === 'Allowed') {
-        setShowModal(false);
-        return;
-      }
+        if (label === 'Allowed') {
+          setShowModal(false);
+          return;
+        }
 
-      setShowModal(true);
+        setShowModal(true);
+      } catch (e) {
+        if (__DEV__) console.warn('[push gate] permission check failed:', e);
+      }
     })();
 
     return () => {
@@ -118,7 +123,7 @@ export function PushNotificationGate() {
     }
   }
 
-  if (!bootstrapped || !isAuthenticated || !userId) {
+  if (!bootstrapped || !isAuthenticated || !userId || isExpoGo()) {
     return null;
   }
 

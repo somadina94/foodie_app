@@ -17,6 +17,7 @@ export type LoginResponse = {
   status: string;
   token: string;
   data: { user: AuthUser };
+  message?: string;
 };
 
 export type SignUpBody = {
@@ -45,6 +46,32 @@ export async function login(email: string, password: string): Promise<LoginRespo
 export async function signUp(body: SignUpBody): Promise<LoginResponse> {
   return apiRequest<LoginResponse>(
     '/users/signUp',
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+    { skipAuth: true },
+  );
+}
+
+export async function forgotPassword(email: string): Promise<{ status: string; message?: string }> {
+  return apiRequest(
+    '/users/forgotPassword',
+    {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    },
+    { skipAuth: true },
+  );
+}
+
+export async function resetPassword(body: {
+  token: string;
+  password: string;
+  passwordConfirm: string;
+}): Promise<LoginResponse> {
+  return apiRequest<LoginResponse>(
+    '/users/resetPassword',
     {
       method: 'POST',
       body: JSON.stringify(body),

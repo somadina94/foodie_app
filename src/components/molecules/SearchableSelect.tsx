@@ -10,13 +10,19 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
+  StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronDown, X } from 'lucide-react-native';
 
 import { theme } from '@/lib/theme';
 
-export type SearchableOption = { value: string; label: string };
+export type SearchableOption = {
+  value: string;
+  label: string;
+  /** Shorter text for the closed trigger (e.g. "+234" for dial codes). */
+  triggerLabel?: string;
+};
 
 type Props = {
   label: string;
@@ -42,19 +48,22 @@ export function SearchableSelect({
   const insets = useSafeAreaInsets();
   const winH = Dimensions.get('window').height;
   const sheetMaxH = winH * 0.88;
-  const listMaxH = Math.min(440, sheetMaxH - 150);
+  const listMaxH = Math.min(480, sheetMaxH - 160);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
-  const selectedLabel = useMemo(() => {
-    const o = options.find((x) => x.value === value);
-    return o?.label ?? '';
-  }, [options, value]);
+  const selected = useMemo(() => options.find((x) => x.value === value), [options, value]);
+  const selectedLabel = selected?.triggerLabel ?? selected?.label ?? '';
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return options;
-    return options.filter((o) => o.label.toLowerCase().includes(q));
+    return options.filter(
+      (o) =>
+        o.label.toLowerCase().includes(q) ||
+        o.value.toLowerCase().includes(q) ||
+        (o.triggerLabel?.toLowerCase().includes(q) ?? false),
+    );
   }, [options, query]);
 
   function close() {
@@ -71,7 +80,9 @@ export function SearchableSelect({
     <View className="mb-4">
       <Text className="mb-2 text-sm font-semibold text-neutral-700">{label}</Text>
       <Pressable
-        onPress={() => !disabled && !loading && setOpen(true)}
+        onPress={() => {
+          if (!disabled && !loading) setOpen(true);
+        }}
         disabled={disabled || loading}
         className={`min-h-[52px] flex-row items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 py-3.5 ${
           disabled || loading ? 'opacity-50' : 'active:bg-neutral-50'
@@ -82,8 +93,10 @@ export function SearchableSelect({
         ) : (
           <>
             <Text
-              className={`flex-1 text-base ${selectedLabel ? 'text-neutral-900' : 'text-neutral-400'}`}
-              numberOfLines={2}
+              className={`flex-1 pr-2 text-base ${
+                selectedLabel ? 'text-neutral-900' : 'text-neutral-400'
+              }`}
+              numberOfLines={1}
             >
               {selectedLabel || placeholder}
             </Text>
@@ -92,10 +105,19 @@ export function SearchableSelect({
         )}
       </Pressable>
 
-      <Modal visible={open} animationType="slide" transparent onRequestClose={close}>
-        <View className="flex-1 justify-end bg-black/50" style={{ flex: 1 }}>
-          <Pressable className="flex-1" onPress={close} accessibilityRole="button" />
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Modal
+        visible={open}
+        animationType="slide"
+        transparent
+        presentationStyle="overFullScreen"
+        onRequestClose={close}
+      >
+        <View style={styles.backdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityRole="button" />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.sheetWrap}
+          >
             <View
               className="rounded-t-3xl bg-white"
               style={{
@@ -105,7 +127,11 @@ export function SearchableSelect({
             >
               <View className="flex-row items-center justify-between border-b border-neutral-200 px-4 py-3">
                 <Text className="text-lg font-bold text-neutral-900">{label}</Text>
-                <Pressable onPress={close} hitSlop={12} className="rounded-full p-2 active:bg-neutral-100">
+                <Pressable
+                  onPress={close}
+                  hitSlop={12}
+                  className="rounded-full p-2 active:bg-neutral-100"
+                >
                   <X color="#404040" size={24} />
                 </Pressable>
               </View>
@@ -117,16 +143,20 @@ export function SearchableSelect({
                 onChangeText={setQuery}
                 autoCorrect={false}
                 autoCapitalize="none"
+                clearButtonMode="while-editing"
               />
               <FlatList
                 data={filtered}
-                keyExtractor={(item) => item.value}
+                keyExtractor={(item) => `${item.value}:${item.label}`}
                 keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
                 style={{ maxHeight: listMaxH }}
                 className="mt-2 px-2"
                 contentContainerStyle={{ paddingBottom: 12 }}
                 ListEmptyComponent={
-                  <Text className="py-8 text-center text-neutral-500">No matches</Text>
+                  <Text className="py-8 text-center text-neutral-500">
+                    {options.length === 0 ? 'No options loaded' : 'No matches'}
+                  </Text>
                 }
                 renderItem={({ item }) => (
                   <Pressable
@@ -136,7 +166,9 @@ export function SearchableSelect({
                     }`}
                   >
                     <Text
-                      className={`text-base ${item.value === value ? 'font-bold text-primary' : 'text-neutral-900'}`}
+                      className={`text-base ${
+                        item.value === value ? 'font-bold text-primary' : 'text-neutral-900'
+                      }`}
                       numberOfLines={3}
                     >
                       {item.label}
@@ -151,3 +183,14 @@ export function SearchableSelect({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  sheetWrap: {
+    width: '100%',
+  },
+});

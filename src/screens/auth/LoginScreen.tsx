@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AnimateIn } from '@/components/atoms/AnimateIn';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { AuthBackButton } from '@/components/atoms/AuthBackButton';
 import { theme } from '@/lib/theme';
 import type { AuthStackParamList } from '@/navigation/types';
 import { TextField } from '@/components/atoms/TextField';
@@ -55,8 +56,10 @@ export function LoginScreen({ navigation }: Props) {
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerClassName="flex-grow px-6 pb-12 pt-16"
+          contentContainerClassName="flex-grow px-6 pb-12 pt-4"
         >
+          <AuthBackButton navigation={navigation} includeSafeTop />
+
           <AnimateIn variant="fadeDown" durationMs={420}>
             <Text className="font-mono text-xs font-bold uppercase tracking-[0.3em] text-primary">
               Foodie
@@ -64,7 +67,7 @@ export function LoginScreen({ navigation }: Props) {
             <Text className="mt-3 text-4xl font-extrabold tracking-tight text-neutral-900">
               Welcome back
             </Text>
-            <Text className="mt-2 text-base text-neutral-500">Sign in to your kitchen dashboard.</Text>
+            <Text className="mt-2 text-base text-neutral-500">Sign in to continue ordering.</Text>
           </AnimateIn>
 
           <AnimateIn variant="fade" delayMs={120} className="mt-12">
@@ -83,6 +86,15 @@ export function LoginScreen({ navigation }: Props) {
               secureTextEntry
               autoComplete="password"
             />
+            <Pressable
+              onPress={() => navigation.navigate('ForgotPassword')}
+              hitSlop={8}
+              className="mb-5 self-end py-1 active:opacity-70"
+            >
+              <Text style={{ color: theme.primary }} className="text-sm font-semibold">
+                Forgot password?
+              </Text>
+            </Pressable>
             {error ? <Text className="mb-4 text-center text-sm text-red-600">{error}</Text> : null}
             <PrimaryButton title="Sign in" loading={loading} onPress={onSubmit} />
             <Pressable onPress={() => navigation.navigate('SignUp')} className="mt-8 items-center py-2">

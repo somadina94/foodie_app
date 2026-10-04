@@ -3,6 +3,7 @@ import { View, Text, Pressable, KeyboardAvoidingView, Platform, ScrollView } fro
 import { LinearGradient } from 'expo-linear-gradient';
 import { Check } from 'lucide-react-native';
 import { AnimateIn } from '@/components/atoms/AnimateIn';
+import { AuthBackButton } from '@/components/atoms/AuthBackButton';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { SearchableSelect } from '@/components/molecules/SearchableSelect';
@@ -205,6 +206,7 @@ export function SignUpScreen({ navigation }: Props) {
   const dialOptions = dialRows.map((r) => ({
     value: r.iso2,
     label: `${r.name} (${r.dial})`,
+    triggerLabel: r.dial,
   }));
 
   return (
@@ -215,13 +217,9 @@ export function SignUpScreen({ navigation }: Props) {
       <LinearGradient colors={['#fff7ed', '#ffffff']} className="flex-1">
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerClassName="px-6 pb-16 pt-12"
+          contentContainerClassName="px-6 pb-16 pt-4"
         >
-          <Pressable onPress={() => navigation.goBack()} className="mb-4 self-start">
-            <Text style={{ color: theme.primary }} className="font-semibold">
-              ← Back
-            </Text>
-          </Pressable>
+          <AuthBackButton navigation={navigation} includeSafeTop />
           <AnimateIn variant="fade">
             <Text className="text-3xl font-extrabold text-neutral-900">Create account</Text>
             <Text className="mt-2 text-neutral-500">Join Foodie to order and track deliveries.</Text>
@@ -251,16 +249,16 @@ export function SignUpScreen({ navigation }: Props) {
             secureTextEntry
           />
 
-          <View className="mb-4 flex-row gap-3">
-            <View className="min-w-0 flex-1">
+          <View className="mb-4 flex-row items-start gap-3">
+            <View style={{ width: '42%' }}>
               <SearchableSelect
                 label="Country code"
                 value={phoneIso2}
                 onChange={setPhoneIso2}
                 options={dialOptions}
-                placeholder="Code"
+                placeholder="+code"
                 loading={loadingDialCodes}
-                disabled={loadingDialCodes}
+                disabled={loadingDialCodes || dialRows.length === 0}
                 searchPlaceholder="Search country or code…"
               />
             </View>
@@ -274,6 +272,11 @@ export function SignUpScreen({ navigation }: Props) {
               />
             </View>
           </View>
+          {!loadingDialCodes && dialRows.length === 0 ? (
+            <Text className="mb-4 text-sm text-red-600">
+              Could not load country codes. Check your connection and reopen this screen.
+            </Text>
+          ) : null}
 
           <SearchableSelect
             label="Country"

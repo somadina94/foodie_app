@@ -52,18 +52,23 @@ function AuthBootstrap({ children }: { children: React.ReactNode }) {
     done.current = true;
     let alive = true;
     (async () => {
-      const token = await getToken();
-      if (!token) {
-        if (alive) dispatch(setBootstrapped(true));
-        return;
-      }
       try {
-        const r = await getMe(token);
-        if (alive) dispatch(setCredentials({ user: r.data.user }));
-      } catch {
-        await deleteToken();
-        if (alive) dispatch(logout());
-      } finally {
+        const token = await getToken();
+        if (!token) {
+          if (alive) dispatch(setBootstrapped(true));
+          return;
+        }
+        try {
+          const r = await getMe(token);
+          if (alive) dispatch(setCredentials({ user: r.data.user }));
+        } catch {
+          await deleteToken();
+          if (alive) dispatch(logout());
+        } finally {
+          if (alive) dispatch(setBootstrapped(true));
+        }
+      } catch (e) {
+        if (__DEV__) console.warn('[auth bootstrap] failed:', e);
         if (alive) dispatch(setBootstrapped(true));
       }
     })();

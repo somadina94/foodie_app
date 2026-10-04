@@ -1,12 +1,15 @@
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import { isRunningInExpoGo } from 'expo';
 
 import { setExpoPushToken } from '@/services/userService';
 import { ApiError } from '@/services/apiClient';
 
 /** Expo Go cannot register remote push tokens (SDK 53+). Need a preview/dev/production build. */
 export function isExpoGo() {
+  // Prefer the official helper — Constants.appOwnership is deprecated and can be null.
+  if (isRunningInExpoGo()) return true;
   return Constants.appOwnership === 'expo';
 }
 
@@ -17,6 +20,10 @@ function getExpoProjectId(): string | undefined {
     Constants?.expoConfig?.extra?.eas?.projectId ??
     (Constants as { easConfig?: { projectId?: string } }).easConfig?.projectId
   );
+}
+
+async function loadNotifications() {
+  return import('expo-notifications');
 }
 
 async function setExpoPushTokenWithRetry(token: string): Promise<void> {
@@ -37,9 +44,8 @@ async function setExpoPushTokenWithRetry(token: string): Promise<void> {
  * Matches Luxestate: Android channel id must be `default` (backend sends channelId: "default").
  */
 export async function ensureAndroidNotificationChannel(): Promise<void> {
-  if (Platform.OS !== 'android') return;
-  // Dynamic import so Expo Go never loads expo-notifications at module top-level paths that call this.
-  const Notifications = await import('expo-notifications');
+  if (Platform.OS !== 'android' || isExpoGo()) return;
+  const Notifications = await loadNotifications();
   await Notifications.setNotificationChannelAsync('default', {
     name: 'Orders & alerts',
     importance: Notifications.AndroidImportance.HIGH,
@@ -49,7 +55,14 @@ export async function ensureAndroidNotificationChannel(): Promise<void> {
 }
 
 export async function getNotificationPermissionLabel(): Promise<string> {
-  const Notifications = await import('expo-notifications');
+  if (isExpoGo()) {
+    // Remote push is unavailable in Expo Go; don't load expo-notifications here.
+    return 'Not set';
+  }
+  const Notifications = await loadNotifications();
+  if (typeof Notifications.getPermissionsAsync !== 'function') {
+    return 'Not set';
+  }
   const { status } = await Notifications.getPermissionsAsync();
   if (status === 'granted') return 'Allowed';
   if (status === 'denied') return 'Denied';
@@ -76,17 +89,19 @@ export async function registerExpoPushTokenOnServer(): Promise<{
     };
   }
 
-  const Notifications = await import('expo-notifications');
+  const Notifications = await loadNotifications();
 
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
+  if (typeof Notifications.setNotificationHandler === 'function') {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  }
 
   await ensureAndroidNotificationChannel();
 
@@ -143,24 +158,30 @@ export async function registerForPushNotificationsAsync(): Promise<{
     if (__DEV__) {
       console.warn('[push] Remote push is disabled in Expo Go. Install your EAS APK/dev build.');
     }
-    return { status: 'undetermined', tokenRegistered: false, errorMessage: 'Expo Go does not support remote push.' };
+    return {
+      status: 'undetermined',
+      tokenRegistered: false,
+      errorMessage: 'Expo Go does not support remote push.',
+    };
   }
   if (!Device.isDevice) {
     if (__DEV__) console.warn('[push] Push requires a physical device.');
     return { status: 'undetermined', tokenRegistered: false, errorMessage: 'Push requires a physical device.' };
   }
 
-  const Notifications = await import('expo-notifications');
+  const Notifications = await loadNotifications();
 
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
+  if (typeof Notifications.setNotificationHandler === 'function') {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  }
 
   await ensureAndroidNotificationChannel();
 
@@ -168,7 +189,6 @@ export async function registerForPushNotificationsAsync(): Promise<{
   let finalStatus = existing;
 
   if (existing !== 'granted') {
-    // Same as Luxestate: plain request (plugin adds Android POST_NOTIFICATIONS).
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
